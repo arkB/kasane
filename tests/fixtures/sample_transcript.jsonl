@@ -1,0 +1,8 @@
+{"role": "human", "content": "Tailscale の設定で困っている。サブネットルータの設定方法は？"}
+{"role": "assistant", "content": "tailscale up --advertise-routes=192.168.1.0/24 でサブネットを広告できます。管理コンソールでルート承認が必要です。"}
+{"role": "human", "content": "VPN の選定について相談したい。社内ネットワークへの安全なアクセス方法を教えて。"}
+{"role": "assistant", "content": "Tailscale は WireGuard ベースで設定が簡単です。ZeroTrust ネットワークとしても機能します。"}
+{"role": "human", "content": "Python で非同期処理を書きたい。asyncio の基本を教えて。"}
+{"role": "assistant", "content": "asyncio は Python の非同期 I/O フレームワークです。async/await 構文を使います。例:\n\nasync def fetch_data():\n    await asyncio.sleep(1)\n    return 'data'\n\nasync def main():\n    result = await fetch_data()\n    print(result)"}
+{"role": "human", "content": "pytest のテストでモックを使いたい。"}
+{"role": "assistant", "content": "pytest-mock プラグインを使うと便利です。mocker fixture でモックを作成できます。\n\ndef test_example(mocker):\n    mock_func = mocker.patch('module.function')\n    mock_func.return_value = 42\n    # テスト実行"}
