@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,16 @@ def parse_transcript(file_path: str | Path) -> tuple[list[MemoryChunk], datetime
     return chunks, created_at
 
 
+def parse_codex_transcript(file_path: str | Path) -> tuple[list[MemoryChunk], datetime]:
+    file_path = Path(file_path)
+    session_id, created_at = _extract_codex_session_info(file_path)
+    messages = _load_codex_messages(file_path)
+    pairs = _create_qa_pairs(messages)
+    chunks = _split_into_chunks(pairs, session_id, created_at, str(file_path))
+    logger.info(f"Parsed {len(chunks)} Codex chunks from {file_path}")
+    return chunks, created_at
+
+
 def _generate_session_id(filename: str) -> str:
     return hashlib.sha256(filename.encode()).hexdigest()[:16]
 
@@ -31,6 +42,36 @@ def _generate_session_id(filename: str) -> str:
 def _extract_created_at(file_path: Path) -> datetime:
     mtime = os.path.getmtime(file_path)
     return datetime.fromtimestamp(mtime)
+
+
+def _parse_iso8601(value: str) -> datetime:
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    return datetime.fromisoformat(value)
+
+
+def _extract_codex_session_info(file_path: Path) -> tuple[str, datetime]:
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid JSON at line {line_num}: {e}")
+                continue
+            if obj.get("type") != "session_meta":
+                continue
+            payload = obj.get("payload", {})
+            session_id = payload.get("id")
+            timestamp = payload.get("timestamp")
+            if not session_id:
+                break
+            if isinstance(timestamp, str):
+                return str(session_id), _parse_iso8601(timestamp)
+            break
+    return _generate_session_id(file_path.name), _extract_created_at(file_path)
 
 
 def _load_messages(file_path: Path) -> list[dict[str, str]]:
@@ -57,6 +98,48 @@ def _load_messages(file_path: Path) -> list[dict[str, str]]:
                 content = "\n".join(content_parts)
             if role and content:
                 messages.append({"role": role, "content": str(content)})
+    return messages
+
+
+def _join_content_parts(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, Iterable):
+        content_parts = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str) and text:
+                    content_parts.append(text)
+            elif isinstance(item, str) and item:
+                content_parts.append(item)
+        return "\n".join(content_parts)
+    return ""
+
+
+def _load_codex_messages(file_path: Path) -> list[dict[str, str]]:
+    messages = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid JSON at line {line_num}: {e}")
+                continue
+            payload = obj.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("type") != "message":
+                continue
+            role = payload.get("role")
+            if role not in ("user", "assistant"):
+                continue
+            content = _join_content_parts(payload.get("content", []))
+            if content:
+                messages.append({"role": str(role), "content": content})
     return messages
 
 

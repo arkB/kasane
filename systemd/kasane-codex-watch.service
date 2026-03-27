@@ -1,0 +1,13 @@
+[Unit]
+Description=kasane Codex session watcher
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/dev/kasane
+ExecStart=%h/dev/kasane/.venv/bin/python -m kasane.main watch-codex --dir %h/.codex/sessions --interval 30 --limit 100
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

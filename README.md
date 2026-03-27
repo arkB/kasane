@@ -14,6 +14,33 @@ uv run python -m kasane.main warmup
 
 ## 使い方
 
+### Codex で使う
+
+このワークスペース直下で Codex を起動している場合、以下を追加する:
+
+- `plugins/kasane/.codex-plugin/plugin.json`
+- `plugins/kasane/.mcp.json`
+- `.agents/plugins/marketplace.json`
+
+Codex 側で `kasane` プラグインを有効化すると、以下の MCP ツールが使える:
+
+- `search_memories` - 過去の会話メモリを検索
+- `memory_stats` - メモリ DB の統計を表示
+
+MCP サーバー本体は `src/kasane/mcp_server.py` で、既存の SQLite DB をそのまま読む。
+
+Codex には Claude Code の `Stop` hook 相当がない前提で、保存は session JSONL の取り込みで行う:
+
+```bash
+# 既存の Codex セッションを一括取り込み
+uv run python -m kasane.main import-codex
+
+# 継続監視して新しい Codex セッションを自動取り込み
+uv run python -m kasane.main watch-codex --interval 30
+```
+
+デフォルトでは `~/.codex/sessions` を読む。初回は埋め込みモデルがローカルに必要なので、事前に `warmup` を済ませておく。
+
 ### 記憶の検索
 
 ```bash

@@ -4,7 +4,9 @@ from kasane import chunker
 from kasane.chunker import (
     MemoryChunk,
     _create_qa_pairs,
+    _extract_codex_session_info,
     _generate_session_id,
+    _load_codex_messages,
     _load_messages,
     _split_into_chunks,
 )
@@ -77,3 +79,45 @@ def test_parse_transcript_integration(tmp_path):
     assert len(chunks) == 1
     assert "Q: Test question?" in chunks[0].chunk_text
     assert "A: Test answer." in chunks[0].chunk_text
+
+
+def test_load_codex_messages(tmp_path):
+    jsonl_file = tmp_path / "codex.jsonl"
+    jsonl_file.write_text(
+        '{"type":"session_meta","payload":{"id":"session-1","timestamp":"2026-03-27T13:03:51.499Z"}}\n'
+        '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"kasane を Codex でも使いたい"}]}}\n'
+        '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"できます。"}]}}\n'
+        '{"type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"ignore me"}]}}\n',
+        encoding="utf-8",
+    )
+    messages = _load_codex_messages(jsonl_file)
+    assert messages == [
+        {"role": "user", "content": "kasane を Codex でも使いたい"},
+        {"role": "assistant", "content": "できます。"},
+    ]
+
+
+def test_extract_codex_session_info(tmp_path):
+    jsonl_file = tmp_path / "codex.jsonl"
+    jsonl_file.write_text(
+        '{"type":"session_meta","payload":{"id":"session-abc","timestamp":"2026-03-27T13:03:51.499Z"}}\n',
+        encoding="utf-8",
+    )
+    session_id, created_at = _extract_codex_session_info(jsonl_file)
+    assert session_id == "session-abc"
+    assert created_at.isoformat().startswith("2026-03-27T13:03:51.499")
+
+
+def test_parse_codex_transcript_integration(tmp_path):
+    jsonl_file = tmp_path / "codex.jsonl"
+    jsonl_file.write_text(
+        '{"type":"session_meta","payload":{"id":"session-xyz","timestamp":"2026-03-27T13:03:51.499Z"}}\n'
+        '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"前に決めた方針は？"}]}}\n'
+        '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"watcher 方式にします。"}]}}\n',
+        encoding="utf-8",
+    )
+    chunks, _ = chunker.parse_codex_transcript(jsonl_file)
+    assert len(chunks) == 1
+    assert chunks[0].session_id == "session-xyz"
+    assert "Q: 前に決めた方針は？" in chunks[0].chunk_text
+    assert "A: watcher 方式にします。" in chunks[0].chunk_text

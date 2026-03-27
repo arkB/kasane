@@ -13,7 +13,11 @@ def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
         logger.info(f"Loading model {MODEL_NAME}...")
-        _model = SentenceTransformer(MODEL_NAME)
+        try:
+            _model = SentenceTransformer(MODEL_NAME, local_files_only=True)
+            logger.info("Loaded model from local cache")
+        except Exception:
+            _model = SentenceTransformer(MODEL_NAME)
         logger.info("Model loaded")
     return _model
 
