@@ -6,7 +6,14 @@ from pathlib import Path
 import pytest
 
 from kasane import storage
-from kasane.storage import MemoryChunk, init_db, insert_chunks, session_exists
+from kasane.storage import (
+    MemoryChunk,
+    delete_session,
+    get_session_import_info,
+    init_db,
+    insert_chunks,
+    session_exists,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -106,3 +113,37 @@ def test_created_at_is_explicit(temp_db):
     result = cursor.fetchone()[0]
     assert "2025-03-15" in result
     conn.close()
+
+
+def test_get_session_import_info(temp_db):
+    chunks = [
+        MemoryChunk(
+            session_id="meta123",
+            chunk_text="Q: Q?\nA: A.",
+            created_at=datetime(2025, 1, 1),
+            metadata={
+                "transcript_path": "/tmp/t.jsonl",
+                "chunk_index": 0,
+                "transcript_mtime": 123.4,
+            },
+        )
+    ]
+    insert_chunks(chunks, [[0.1] * 768])
+    info = get_session_import_info("meta123")
+    assert info is not None
+    assert info.chunk_count == 1
+    assert info.transcript_mtime == 123.4
+
+
+def test_delete_session(temp_db):
+    chunks = [
+        MemoryChunk(
+            session_id="delete123",
+            chunk_text="Q: Q?\nA: A.",
+            created_at=datetime(2025, 1, 1),
+            metadata={"transcript_path": "/tmp/t.jsonl", "chunk_index": 0},
+        )
+    ]
+    insert_chunks(chunks, [[0.1] * 768])
+    delete_session("delete123")
+    assert not session_exists("delete123")

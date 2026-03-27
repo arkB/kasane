@@ -18,9 +18,16 @@ def parse_transcript(file_path: str | Path) -> tuple[list[MemoryChunk], datetime
     file_path = Path(file_path)
     session_id = _generate_session_id(file_path.name)
     created_at = _extract_created_at(file_path)
+    transcript_mtime = os.path.getmtime(file_path)
     messages = _load_messages(file_path)
     pairs = _create_qa_pairs(messages)
-    chunks = _split_into_chunks(pairs, session_id, created_at, str(file_path))
+    chunks = _split_into_chunks(
+        pairs,
+        session_id,
+        created_at,
+        str(file_path),
+        transcript_mtime=transcript_mtime,
+    )
     logger.info(f"Parsed {len(chunks)} chunks from {file_path}")
     return chunks, created_at
 
@@ -28,9 +35,16 @@ def parse_transcript(file_path: str | Path) -> tuple[list[MemoryChunk], datetime
 def parse_codex_transcript(file_path: str | Path) -> tuple[list[MemoryChunk], datetime]:
     file_path = Path(file_path)
     session_id, created_at = _extract_codex_session_info(file_path)
+    transcript_mtime = os.path.getmtime(file_path)
     messages = _load_codex_messages(file_path)
     pairs = _create_qa_pairs(messages)
-    chunks = _split_into_chunks(pairs, session_id, created_at, str(file_path))
+    chunks = _split_into_chunks(
+        pairs,
+        session_id,
+        created_at,
+        str(file_path),
+        transcript_mtime=transcript_mtime,
+    )
     logger.info(f"Parsed {len(chunks)} Codex chunks from {file_path}")
     return chunks, created_at
 
@@ -174,6 +188,7 @@ def _split_into_chunks(
     session_id: str,
     created_at: datetime,
     transcript_path: str,
+    transcript_mtime: float | None = None,
 ) -> list[MemoryChunk]:
     chunks = []
     chunk_index = 0
@@ -190,13 +205,19 @@ def _split_into_chunks(
                     metadata={
                         "transcript_path": transcript_path,
                         "chunk_index": chunk_index,
+                        "transcript_mtime": transcript_mtime,
                     },
                 )
             )
             chunk_index += 1
         else:
             sub_chunks = _split_long_text(
-                human_text, assistant_text, session_id, created_at, transcript_path
+                human_text,
+                assistant_text,
+                session_id,
+                created_at,
+                transcript_path,
+                transcript_mtime=transcript_mtime,
             )
             for idx, sub_chunk in enumerate(sub_chunks):
                 sub_chunk.metadata["chunk_index"] = chunk_index + idx
@@ -211,6 +232,7 @@ def _split_long_text(
     session_id: str,
     created_at: datetime,
     transcript_path: str,
+    transcript_mtime: float | None = None,
 ) -> list[MemoryChunk]:
     chunks = []
     human_parts = _split_by_boundaries(human_text, "human")
@@ -225,7 +247,11 @@ def _split_long_text(
                 session_id=session_id,
                 chunk_text=combined,
                 created_at=created_at,
-                metadata={"transcript_path": transcript_path, "chunk_index": 0},
+                metadata={
+                    "transcript_path": transcript_path,
+                    "chunk_index": 0,
+                    "transcript_mtime": transcript_mtime,
+                },
             )
         )
     return chunks

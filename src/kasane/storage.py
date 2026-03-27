@@ -30,6 +30,12 @@ class MemoryResult:
     session_id: str
 
 
+@dataclass
+class SessionImportInfo:
+    chunk_count: int
+    transcript_mtime: float | None
+
+
 def _get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.enable_load_extension(True)
@@ -107,6 +113,54 @@ def session_exists(session_id: str) -> bool:
     exists = cursor.fetchone() is not None
     conn.close()
     return exists
+
+
+def get_session_import_info(session_id: str) -> SessionImportInfo | None:
+    conn = _get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT metadata FROM memories WHERE session_id = ? ORDER BY id LIMIT 1",
+        (session_id,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        conn.close()
+        return None
+    cursor.execute("SELECT COUNT(*) FROM memories WHERE session_id = ?", (session_id,))
+    chunk_count = cursor.fetchone()[0]
+    transcript_mtime = None
+    metadata_raw = row[0]
+    if metadata_raw:
+        metadata = json.loads(metadata_raw)
+        transcript_mtime_raw = metadata.get("transcript_mtime")
+        if transcript_mtime_raw is not None:
+            transcript_mtime = float(transcript_mtime_raw)
+    conn.close()
+    return SessionImportInfo(
+        chunk_count=chunk_count,
+        transcript_mtime=transcript_mtime,
+    )
+
+
+def delete_session(session_id: str) -> None:
+    conn = _get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM memories WHERE session_id = ?", (session_id,))
+        memory_ids = [row[0] for row in cursor.fetchall()]
+        if memory_ids:
+            placeholders = ",".join("?" * len(memory_ids))
+            cursor.execute(
+                f"DELETE FROM memories_vec WHERE id IN ({placeholders})",
+                memory_ids,
+            )
+        cursor.execute("DELETE FROM memories WHERE session_id = ?", (session_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def insert_chunks(chunks: list[MemoryChunk], embeddings: list[list[float]]) -> None:

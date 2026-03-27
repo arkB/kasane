@@ -28,9 +28,25 @@ def _save_chunks(chunks: list[storage.MemoryChunk]) -> bool:
         logger.warning("No chunks to save.")
         return False
     session_id = chunks[0].session_id
-    if storage.session_exists(session_id):
-        logger.info(f"Session {session_id} already exists. Skipping.")
-        return False
+    incoming_mtime_raw = chunks[0].metadata.get("transcript_mtime")
+    incoming_mtime = (
+        float(incoming_mtime_raw) if incoming_mtime_raw is not None else None
+    )
+    existing = storage.get_session_import_info(session_id)
+    if existing is not None:
+        is_newer = (
+            incoming_mtime is not None
+            and (
+                existing.transcript_mtime is None
+                or incoming_mtime > existing.transcript_mtime
+            )
+        )
+        has_more_chunks = len(chunks) > existing.chunk_count
+        if not is_newer and not has_more_chunks:
+            logger.info(f"Session {session_id} already exists. Skipping.")
+            return False
+        logger.info(f"Replacing stored session {session_id} with a newer transcript.")
+        storage.delete_session(session_id)
     embeddings = embedder.encode([c.chunk_text for c in chunks], prefix="passage")
     if isinstance(embeddings[0], float):
         embeddings = [embeddings]
