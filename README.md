@@ -16,18 +16,12 @@ uv run python -m kasane.main warmup
 
 ### Codex で使う
 
-このワークスペース直下で Codex を起動している場合、以下を追加する:
+Codex からは `src/kasane/mcp_server.py` を MCP サーバーとして使う。
 
-- `plugins/kasane/.codex-plugin/plugin.json`
-- `plugins/kasane/.mcp.json`
-- `.agents/plugins/marketplace.json`
-
-Codex 側で `kasane` プラグインを有効化すると、以下の MCP ツールが使える:
+Codex 側で `kasane` を有効化すると、以下の MCP ツールが使える:
 
 - `search_memories` - 過去の会話メモリを検索
 - `memory_stats` - メモリ DB の統計を表示
-
-MCP サーバー本体は `src/kasane/mcp_server.py` で、既存の SQLite DB をそのまま読む。
 
 Codex には Claude Code の `Stop` hook 相当がない前提で、保存は session JSONL の取り込みで行う:
 
