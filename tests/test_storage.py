@@ -7,12 +7,14 @@ import pytest
 
 from kasane import storage
 from kasane.storage import (
+    get_import_state,
     MemoryChunk,
     delete_session,
     get_session_import_info,
     init_db,
     insert_chunks,
     session_exists,
+    set_import_state,
 )
 
 
@@ -147,3 +149,17 @@ def test_delete_session(temp_db):
     insert_chunks(chunks, [[0.1] * 768])
     delete_session("delete123")
     assert not session_exists("delete123")
+
+
+def test_import_state_round_trip(temp_db):
+    assert get_import_state("watch-codex:test") is None
+    set_import_state("watch-codex:test", "123.4")
+    state = get_import_state("watch-codex:test")
+    assert state is not None
+    assert state.state_key == "watch-codex:test"
+    assert state.state_value == "123.4"
+
+    set_import_state("watch-codex:test", "456.7")
+    updated_state = get_import_state("watch-codex:test")
+    assert updated_state is not None
+    assert updated_state.state_value == "456.7"

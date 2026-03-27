@@ -1,11 +1,11 @@
 [Unit]
-Description=kasane Codex session watcher
+Description=kasane session watcher
 After=default.target
 
 [Service]
 Type=simple
 WorkingDirectory=%h/dev/kasane
-ExecStart=%h/dev/kasane/.venv/bin/python -m kasane.main watch-codex --dir %h/.codex/sessions --interval 30 --limit 100
+ExecStart=%h/dev/kasane/.venv/bin/python -m kasane.main watch-all --codex-dir %h/.codex/sessions --opencode-db %h/.local/share/opencode/opencode.db --interval 30 --codex-limit 100 --opencode-limit 100
 Restart=always
 RestartSec=10
 

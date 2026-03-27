@@ -36,6 +36,12 @@ class SessionImportInfo:
     transcript_mtime: float | None
 
 
+@dataclass
+class ImportState:
+    state_key: str
+    state_value: str
+
+
 def _get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.enable_load_extension(True)
@@ -55,6 +61,11 @@ def init_db() -> None:
             chunk_text TEXT NOT NULL,
             created_at DATETIME NOT NULL,
             metadata JSON
+        );
+
+        CREATE TABLE IF NOT EXISTS import_state (
+            state_key TEXT PRIMARY KEY,
+            state_value TEXT NOT NULL
         );
 
         CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories(session_id);
@@ -155,6 +166,40 @@ def delete_session(session_id: str) -> None:
                 memory_ids,
             )
         cursor.execute("DELETE FROM memories WHERE session_id = ?", (session_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_import_state(state_key: str) -> ImportState | None:
+    conn = _get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT state_key, state_value FROM import_state WHERE state_key = ?",
+        (state_key,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return ImportState(state_key=row[0], state_value=row[1])
+
+
+def set_import_state(state_key: str, state_value: str) -> None:
+    conn = _get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO import_state (state_key, state_value)
+            VALUES (?, ?)
+            ON CONFLICT(state_key) DO UPDATE SET state_value = excluded.state_value
+            """,
+            (state_key, state_value),
+        )
         conn.commit()
     except Exception:
         conn.rollback()
