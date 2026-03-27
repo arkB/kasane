@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import sqlite3
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +47,26 @@ def parse_codex_transcript(file_path: str | Path) -> tuple[list[MemoryChunk], da
         transcript_mtime=transcript_mtime,
     )
     logger.info(f"Parsed {len(chunks)} Codex chunks from {file_path}")
+    return chunks, created_at
+
+
+def parse_opencode_session(
+    db_path: str | Path, session_id: str
+) -> tuple[list[MemoryChunk], datetime]:
+    db_path = Path(db_path)
+    session_meta, messages = _load_opencode_session(db_path, session_id)
+    created_at = datetime.fromtimestamp(session_meta["time_created"] / 1000)
+    session_updated = session_meta["time_updated"] / 1000
+    pairs = _create_qa_pairs(messages)
+    transcript_path = f"opencode-db:{db_path}#{session_id}"
+    chunks = _split_into_chunks(
+        pairs,
+        session_id,
+        created_at,
+        transcript_path,
+        transcript_mtime=session_updated,
+    )
+    logger.info(f"Parsed {len(chunks)} OpenCode chunks from session {session_id}")
     return chunks, created_at
 
 
@@ -155,6 +176,76 @@ def _load_codex_messages(file_path: Path) -> list[dict[str, str]]:
             if content:
                 messages.append({"role": str(role), "content": content})
     return messages
+
+
+def _load_opencode_session(
+    db_path: Path, session_id: str
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, directory, time_created, time_updated FROM session WHERE id = ?",
+        (session_id,),
+    )
+    session_row = cursor.fetchone()
+    if session_row is None:
+        conn.close()
+        raise ValueError(f"OpenCode session not found: {session_id}")
+
+    cursor.execute(
+        """
+        SELECT
+            m.id,
+            m.time_created,
+            m.data,
+            p.time_created,
+            p.data
+        FROM message m
+        LEFT JOIN part p ON p.message_id = m.id
+        WHERE m.session_id = ?
+        ORDER BY m.time_created ASC, p.time_created ASC
+        """,
+        (session_id,),
+    )
+
+    message_map: dict[str, dict[str, Any]] = {}
+    message_order: list[str] = []
+    for message_id, _message_time, message_data_raw, _part_time, part_data_raw in cursor.fetchall():
+        if message_id not in message_map:
+            message_data = json.loads(message_data_raw)
+            message_map[message_id] = {
+                "role": message_data.get("role", ""),
+                "parts": [],
+            }
+            message_order.append(message_id)
+        if part_data_raw:
+            message_map[message_id]["parts"].append(json.loads(part_data_raw))
+    conn.close()
+
+    messages = []
+    for message_id in message_order:
+        message = message_map[message_id]
+        role = str(message["role"])
+        if role not in ("user", "assistant"):
+            continue
+        text_parts = [
+            part["text"]
+            for part in message["parts"]
+            if isinstance(part, dict)
+            and part.get("type") == "text"
+            and isinstance(part.get("text"), str)
+            and part.get("text")
+        ]
+        content = "\n".join(text_parts).strip()
+        if content:
+            messages.append({"role": role, "content": content})
+
+    return {
+        "id": session_row[0],
+        "directory": session_row[1],
+        "time_created": session_row[2],
+        "time_updated": session_row[3],
+    }, messages
 
 
 def _create_qa_pairs(messages: list[dict[str, str]]) -> list[dict[str, str]]:

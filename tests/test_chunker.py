@@ -121,3 +121,88 @@ def test_parse_codex_transcript_integration(tmp_path):
     assert chunks[0].session_id == "session-xyz"
     assert "Q: 前に決めた方針は？" in chunks[0].chunk_text
     assert "A: watcher 方式にします。" in chunks[0].chunk_text
+
+
+def test_parse_opencode_session_integration(tmp_path):
+    import sqlite3
+
+    db_path = tmp_path / "opencode.db"
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, time_created INTEGER, time_updated INTEGER, time_archived INTEGER)"
+    )
+    cur.execute(
+        "CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT)"
+    )
+    cur.execute(
+        "CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT)"
+    )
+    cur.execute(
+        "INSERT INTO session VALUES (?, ?, ?, ?, ?)",
+        ("ses_1", "/tmp/project", 1774540537313, 1774541463395, None),
+    )
+    cur.execute(
+        "INSERT INTO message VALUES (?, ?, ?, ?, ?)",
+        (
+            "msg_1",
+            "ses_1",
+            1774540537313,
+            1774540537313,
+            '{"role":"user"}',
+        ),
+    )
+    cur.execute(
+        "INSERT INTO message VALUES (?, ?, ?, ?, ?)",
+        (
+            "msg_2",
+            "ses_1",
+            1774540537314,
+            1774540537315,
+            '{"role":"assistant"}',
+        ),
+    )
+    cur.execute(
+        "INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "prt_1",
+            "msg_1",
+            "ses_1",
+            1774540537313,
+            1774540537313,
+            '{"type":"text","text":"kasane を opencode でも使いたい"}',
+        ),
+    )
+    cur.execute(
+        "INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "prt_2",
+            "msg_2",
+            "ses_1",
+            1774540537314,
+            1774540537314,
+            '{"type":"reasoning","text":"ignore"}',
+        ),
+    )
+    cur.execute(
+        "INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "prt_3",
+            "msg_2",
+            "ses_1",
+            1774540537315,
+            1774540537315,
+            '{"type":"text","text":"watcher 方式で使えます。"}',
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    chunks, created_at = chunker.parse_opencode_session(db_path, "ses_1")
+    assert len(chunks) == 1
+    assert chunks[0].session_id == "ses_1"
+    assert "Q: kasane を opencode でも使いたい" in chunks[0].chunk_text
+    assert "A: watcher 方式で使えます。" in chunks[0].chunk_text
+    assert chunks[0].metadata["transcript_path"].startswith("opencode-db:")
+    assert chunks[0].metadata["transcript_mtime"] == 1774541463.395
+    assert created_at.isoformat().startswith("2026-03-27")

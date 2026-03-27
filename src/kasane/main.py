@@ -14,6 +14,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 DEFAULT_CODEX_SESSIONS_DIR = Path.home() / ".codex" / "sessions"
+DEFAULT_OPENCODE_DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 
 
 def cmd_warmup(args: argparse.Namespace) -> None:
@@ -100,6 +101,24 @@ def _iter_codex_session_files(sessions_dir: Path) -> list[Path]:
     return sorted(p for p in sessions_dir.rglob("*.jsonl") if p.is_file())
 
 
+def _iter_opencode_session_ids(db_path: Path) -> list[str]:
+    import sqlite3
+
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id
+        FROM session
+        WHERE time_archived IS NULL
+        ORDER BY time_updated ASC
+        """
+    )
+    session_ids = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return session_ids
+
+
 def _import_codex_sessions(sessions_dir: Path, limit: int | None = None) -> tuple[int, int]:
     storage.init_db()
     files = _iter_codex_session_files(sessions_dir)
@@ -109,6 +128,22 @@ def _import_codex_sessions(sessions_dir: Path, limit: int | None = None) -> tupl
     skipped = 0
     for file_path in files:
         chunks, _ = chunker.parse_codex_transcript(file_path)
+        if _save_chunks(chunks):
+            imported += 1
+        else:
+            skipped += 1
+    return imported, skipped
+
+
+def _import_opencode_sessions(db_path: Path, limit: int | None = None) -> tuple[int, int]:
+    storage.init_db()
+    session_ids = _iter_opencode_session_ids(db_path)
+    if limit is not None:
+        session_ids = session_ids[-limit:]
+    imported = 0
+    skipped = 0
+    for session_id in session_ids:
+        chunks, _ = chunker.parse_opencode_session(db_path, session_id)
         if _save_chunks(chunks):
             imported += 1
         else:
@@ -133,6 +168,28 @@ def cmd_watch_codex(args: argparse.Namespace) -> None:
     while True:
         imported, skipped = _import_codex_sessions(sessions_dir, limit=args.limit)
         logger.info(f"Codex import cycle complete. imported={imported} skipped={skipped}")
+        time.sleep(args.interval)
+
+
+def cmd_import_opencode(args: argparse.Namespace) -> None:
+    db_path = Path(args.db).expanduser()
+    if not db_path.exists():
+        raise FileNotFoundError(f"OpenCode database not found: {db_path}")
+    imported, skipped = _import_opencode_sessions(db_path, limit=args.limit)
+    print(f"Imported OpenCode sessions: {imported}")
+    print(f"Skipped OpenCode sessions: {skipped}")
+
+
+def cmd_watch_opencode(args: argparse.Namespace) -> None:
+    db_path = Path(args.db).expanduser()
+    if not db_path.exists():
+        raise FileNotFoundError(f"OpenCode database not found: {db_path}")
+    logger.info(f"Watching OpenCode database at {db_path}")
+    while True:
+        imported, skipped = _import_opencode_sessions(db_path, limit=args.limit)
+        logger.info(
+            f"OpenCode import cycle complete. imported={imported} skipped={skipped}"
+        )
         time.sleep(args.interval)
 
 
@@ -196,6 +253,42 @@ def main() -> None:
         help="Only inspect the most recent N session files per polling cycle",
     )
     watch_codex_parser.set_defaults(func=cmd_watch_codex)
+    import_opencode_parser = subparsers.add_parser(
+        "import-opencode", help="Import completed OpenCode sessions into memory"
+    )
+    import_opencode_parser.add_argument(
+        "--db",
+        default=str(DEFAULT_OPENCODE_DB_PATH),
+        help=f"OpenCode database path (default: {DEFAULT_OPENCODE_DB_PATH})",
+    )
+    import_opencode_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Only inspect the most recent N sessions",
+    )
+    import_opencode_parser.set_defaults(func=cmd_import_opencode)
+    watch_opencode_parser = subparsers.add_parser(
+        "watch-opencode", help="Continuously import new OpenCode sessions"
+    )
+    watch_opencode_parser.add_argument(
+        "--db",
+        default=str(DEFAULT_OPENCODE_DB_PATH),
+        help=f"OpenCode database path (default: {DEFAULT_OPENCODE_DB_PATH})",
+    )
+    watch_opencode_parser.add_argument(
+        "--interval",
+        type=int,
+        default=30,
+        help="Polling interval in seconds (default: 30)",
+    )
+    watch_opencode_parser.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Only inspect the most recent N sessions per polling cycle",
+    )
+    watch_opencode_parser.set_defaults(func=cmd_watch_opencode)
     args = parser.parse_args()
     if args.command is None:
         parser.print_help()

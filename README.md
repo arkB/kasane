@@ -35,6 +35,20 @@ uv run python -m kasane.main watch-codex --interval 30
 
 デフォルトでは `~/.codex/sessions` を読む。初回は埋め込みモデルがローカルに必要なので、事前に `warmup` を済ませておく。
 
+### OpenCode で使う
+
+OpenCode では `~/.local/share/opencode/opencode.db` を読み、保存済み session から会話を取り込む。
+
+```bash
+# 既存の OpenCode session を一括取り込み
+uv run python -m kasane.main import-opencode
+
+# 継続監視して新しい OpenCode session を自動取り込み
+uv run python -m kasane.main watch-opencode --interval 30
+```
+
+おすすめ運用は Codex と同じで、保存は watcher で自動化し、継続タスクの開始時には `kasane` を参照する。
+
 ### おすすめの使い方
 
 #### Claude Code ユーザー
@@ -49,6 +63,12 @@ uv run python -m kasane.main watch-codex --interval 30
 - 継続作業や以前の方針確認では、作業の早い段階で `kasane` を引く運用にする
 - 特におすすめなのは、workspace 親フォルダの `AGENTS.md` に「継続タスクでは開始時に `kasane` を参照する」ルールを書くこと
 
+#### OpenCode ユーザー
+
+- `watch-opencode` を常駐させて `~/.local/share/opencode/opencode.db` から記憶を自動取り込みする
+- 必要なときに `kasane search` や custom command `/memory` で過去の記憶を検索する
+- workspace 親フォルダの `.opencode/agents/` に、継続タスクでは開始時に `kasane` を参照するルールを書く
+
 #### 共通
 
 - 保存先 DB は共通なので、Claude と Codex の両方の記憶を同じストアで検索できる
@@ -60,6 +80,7 @@ uv run python -m kasane.main watch-codex --interval 30
 - Claude では session 終了時に自動保存し、必要なときだけ検索する
 - Codex では `watch-codex` を常駐させて自動保存し、継続タスクの開始時に `kasane` を参照する
 - Codex での実運用は、親 workspace の `AGENTS.md` に参照ルールを書いて自動的にその判断をさせる形が扱いやすい
+- OpenCode でも `watch-opencode` を常駐させ、親 workspace の `.opencode/agents/` と custom command で同じ運用に寄せる
 - 「前回の続き」「以前決めた方針」「過去に触った設定の再開」のような依頼で特に効果が高い
 - 毎回必ず検索するのではなく、過去の文脈が効きそうな場面で優先して使う
 

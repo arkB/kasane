@@ -1,0 +1,13 @@
+[Unit]
+Description=kasane OpenCode session watcher
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/dev/kasane
+ExecStart=%h/dev/kasane/.venv/bin/python -m kasane.main watch-opencode --db %h/.local/share/opencode/opencode.db --interval 30 --limit 100
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
