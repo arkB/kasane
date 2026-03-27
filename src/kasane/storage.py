@@ -252,12 +252,26 @@ def _bytes_to_embedding(data: bytes) -> list[float]:
     return list(struct.unpack(f"<{len(data) // 4}f", data))
 
 
+def _escape_fts_term(term: str) -> str:
+    return '"' + term.replace('"', '""') + '"'
+
+
+def normalize_fts_query(query: str) -> str:
+    terms = [part.strip() for part in query.split() if part.strip()]
+    if not terms:
+        return ""
+    return " OR ".join(_escape_fts_term(term) for term in terms)
+
+
 def fts_search(query: str, limit: int = 50) -> list[tuple[int, int]]:
+    normalized_query = normalize_fts_query(query)
+    if not normalized_query:
+        return []
     conn = _get_connection()
     cursor = conn.cursor()
     cursor.execute(
         "SELECT rowid FROM memories_fts WHERE memories_fts MATCH ? ORDER BY rank LIMIT ?",
-        (query, limit),
+        (normalized_query, limit),
     )
     results = [(row[0], rank + 1) for rank, row in enumerate(cursor.fetchall())]
     conn.close()

@@ -130,3 +130,19 @@ def test_is_session_current(monkeypatch):
     assert main._is_session_current("session-1", 200.0)
     assert main._is_session_current("session-1", 150.0)
     assert not main._is_session_current("session-1", 250.0)
+
+
+def test_normalize_cli_argv_keeps_regular_query():
+    argv = ["kasane.main", "search", "--query", "watch-all", "--top-k", "3"]
+    assert main._normalize_cli_argv(argv) == argv
+
+
+def test_normalize_cli_argv_handles_hyphen_only_query():
+    argv = ["kasane.main", "search", "--query", "---", "--top-k", "2"]
+    assert main._normalize_cli_argv(argv) == [
+        "kasane.main",
+        "search",
+        "--query=---",
+        "--top-k",
+        "2",
+    ]

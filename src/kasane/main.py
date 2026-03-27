@@ -19,6 +19,21 @@ WATCH_LOOKBACK_SECONDS = 300
 WATCH_SETTLE_SECONDS = 120
 
 
+def _normalize_cli_argv(argv: list[str]) -> list[str]:
+    if len(argv) < 4 or argv[1] != "search":
+        return argv
+    normalized = list(argv)
+    for i in range(2, len(normalized) - 1):
+        if normalized[i] != "--query":
+            continue
+        value = normalized[i + 1]
+        if value.startswith("-"):
+            normalized[i] = f"--query={value}"
+            del normalized[i + 1]
+        break
+    return normalized
+
+
 def cmd_warmup(args: argparse.Namespace) -> None:
     logger.info("Starting warmup...")
     embedder.warmup()
@@ -482,7 +497,7 @@ def main() -> None:
         help="Only inspect the most recent N OpenCode sessions per polling cycle",
     )
     watch_all_parser.set_defaults(func=cmd_watch_all)
-    args = parser.parse_args()
+    args = parser.parse_args(_normalize_cli_argv(sys.argv)[1:])
     if args.command is None:
         parser.print_help()
         sys.exit(1)

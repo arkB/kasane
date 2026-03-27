@@ -13,6 +13,7 @@ from kasane.storage import (
     get_session_import_info,
     init_db,
     insert_chunks,
+    normalize_fts_query,
     session_exists,
     set_import_state,
 )
@@ -163,3 +164,9 @@ def test_import_state_round_trip(temp_db):
     updated_state = get_import_state("watch-codex:test")
     assert updated_state is not None
     assert updated_state.state_value == "456.7"
+
+
+def test_normalize_fts_query_quotes_terms():
+    assert normalize_fts_query("watch-all watcher") == '"watch-all" OR "watcher"'
+    assert normalize_fts_query('foo "bar"') == '"foo" OR """bar"""'
+    assert normalize_fts_query("   ") == ""
