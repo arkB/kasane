@@ -2,14 +2,21 @@
 
 Claude Code / Codex / OpenCode のセッション間で会話の記憶を永続化するシステム。
 
-## セットアップ
+## Quick Start
 
 ```bash
-# 依存パッケージのインストール
+# 依存パッケージをインストール
 uv sync
 
-# モデルの事前ダウンロード（初回必須、約1.2GB）
-uv run python -m kasane.main warmup
+# 埋め込みモデルを事前ダウンロード
+# 初回はモデル取得や初期化に時間とディスク容量がかかる
+uv run kasane warmup
+
+# 保存済みメモリの状態を確認
+uv run kasane stats
+
+# 過去の会話を検索
+uv run kasane search --query "Tailscale 設定"
 ```
 
 ## 使い方
@@ -28,10 +35,10 @@ uv run python -m kasane.main warmup
 
 ```bash
 # 基本検索（デフォルト top_k=5）
-uv run python -m kasane.main search --query "Tailscale の設定方法"
+uv run kasane search --query "Tailscale の設定方法"
 
 # 結果数を変更
-uv run python -m kasane.main search --query "Python 非同期処理" --top-k 10
+uv run kasane search --query "Python 非同期処理" --top-k 10
 ```
 
 #### Claude Code
@@ -41,7 +48,7 @@ uv run python -m kasane.main search --query "Python 非同期処理" --top-k 10
 ```text
 ## カスタムコマンド
 /memory <query> — kasane を検索して関連する過去の会話を取得する。
-実行: cd /path/to/kasane && uv run python -m kasane.main search --query "<query>"
+実行: cd /path/to/kasane && uv run kasane search --query "<query>"
 ```
 
 #### Codex
@@ -93,10 +100,10 @@ Hook コマンドは Claude Code から stdin で渡される JSON の `transcri
 
 ```bash
 # 既存の Codex セッションを一括取り込み
-uv run python -m kasane.main import-codex
+uv run kasane import-codex
 
 # 常駐監視では Codex / OpenCode を 1 プロセスでまとめて監視する
-uv run python -m kasane.main watch-all --interval 30
+uv run kasane watch-all --interval 30
 ```
 
 #### OpenCode
@@ -107,10 +114,10 @@ uv run python -m kasane.main watch-all --interval 30
 
 ```bash
 # 既存の OpenCode session を一括取り込み
-uv run python -m kasane.main import-opencode
+uv run kasane import-opencode
 
 # 常駐監視では Codex / OpenCode を 1 プロセスでまとめて監視する
-uv run python -m kasane.main watch-all --interval 30
+uv run kasane watch-all --interval 30
 ```
 
 #### 常駐 watcher のおすすめ運用
@@ -129,13 +136,13 @@ uv run python -m kasane.main watch-all --interval 30
 ### 統計情報
 
 ```bash
-uv run python -m kasane.main stats
+uv run kasane stats
 ```
 
 ### データベース最適化
 
 ```bash
-uv run python -m kasane.main optimize
+uv run kasane optimize
 ```
 
 ## アーキテクチャ
