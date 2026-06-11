@@ -68,16 +68,22 @@ uv run python -m kasane.main search --query "Python 非同期処理" --top-k 10
 ```json
 {
   "hooks": {
-    "PostToolUse": [
+    "Stop": [
       {
-        "matcher": "Stop",
-        "command": "cd /path/to/kasane && uv run python -m kasane.main save --transcript \"$CLAUDE_TRANSCRIPT\"",
-        "timeout": 30
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TRANSCRIPT=$(jq -r '.transcript_path // empty'); if [ -n \"$TRANSCRIPT\" ]; then cd /path/to/kasane && uv run kasane save --transcript \"$TRANSCRIPT\"; fi",
+            "timeout": 30
+          }
+        ]
       }
     ]
   }
 }
 ```
+
+Hook コマンドは Claude Code から stdin で渡される JSON の `transcript_path` を使う。`jq` が必要。
 
 #### Codex
 
