@@ -93,8 +93,9 @@ def cmd_save(args: argparse.Namespace) -> None:
 def cmd_search(args: argparse.Namespace) -> None:
     query = args.query
     top_k = args.top_k if hasattr(args, "top_k") else 5
+    use_vector = not getattr(args, "no_vector", False)
     storage.init_db()
-    results = search.hybrid_search(query, top_k=top_k)
+    results = search.hybrid_search(query, top_k=top_k, use_vector=use_vector)
     if not results:
         print(f"No memories found for: {query}")
         return
@@ -387,6 +388,11 @@ def main() -> None:
     search_parser.add_argument("--query", required=True, help="Search query")
     search_parser.add_argument(
         "--top-k", type=int, default=5, help="Number of results (default: 5)"
+    )
+    search_parser.add_argument(
+        "--no-vector",
+        action="store_true",
+        help="Skip embedding model and vector search",
     )
     search_parser.set_defaults(func=cmd_search)
     stats_parser = subparsers.add_parser("stats", help="Show memory statistics")

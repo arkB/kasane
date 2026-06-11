@@ -18,16 +18,21 @@ def time_decay(days_old: float, half_life: float = TIME_DECAY_HALF_LIFE) -> floa
     return math.pow(0.5, days_old / half_life)
 
 
-def hybrid_search(query: str, top_k: int = 5) -> list[MemoryResult]:
+def hybrid_search(
+    query: str, top_k: int = 5, use_vector: bool = True
+) -> list[MemoryResult]:
     fts_results = fts_search(query, limit=50)
     vec_results: list[tuple[int, float]] = []
-    try:
-        query_embedding = encode(query, prefix="query")
-        if isinstance(query_embedding[0], list):
-            query_embedding = query_embedding[0]
-        vec_results = vec_search(query_embedding, limit=50)
-    except Exception as e:
-        logger.warning(f"Vector search unavailable, falling back to FTS-only search: {e}")
+    if use_vector:
+        try:
+            query_embedding = encode(query, prefix="query")
+            if isinstance(query_embedding[0], list):
+                query_embedding = query_embedding[0]
+            vec_results = vec_search(query_embedding, limit=50)
+        except Exception as e:
+            logger.warning(
+                f"Vector search unavailable, falling back to FTS-only search: {e}"
+            )
     id_scores: dict[int, float] = {}
     for id_, rank in fts_results:
         id_scores[id_] = id_scores.get(id_, 0.0) + rrf_score(rank)

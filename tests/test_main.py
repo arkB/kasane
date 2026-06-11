@@ -193,3 +193,40 @@ def test_main_non_save_failure_exits_nonzero(monkeypatch):
         main.main()
 
     assert exc_info.value.code != 0
+
+
+def test_cmd_search_passes_no_vector_to_hybrid_search(monkeypatch, capsys):
+    calls = []
+
+    def fake_hybrid_search(query, top_k=5, use_vector=True):
+        assert "sentence_transformers" not in sys.modules
+        calls.append((query, top_k, use_vector))
+        return [
+            type(
+                "Result",
+                (),
+                {
+                    "score": 0.25,
+                    "created_at": type(
+                        "CreatedAt", (), {"strftime": lambda _self, _fmt: "2026-01-02"}
+                    )(),
+                    "session_id": "session-1",
+                    "chunk_text": "Q: test\nA: result",
+                },
+            )()
+        ]
+
+    monkeypatch.setattr(main.storage, "init_db", lambda: None)
+    monkeypatch.setattr(main.search, "hybrid_search", fake_hybrid_search)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["kasane", "search", "--query", "Tailscale 設定", "--top-k", "3", "--no-vector"],
+    )
+
+    main.main()
+
+    assert calls == [("Tailscale 設定", 3, False)]
+    output = capsys.readouterr().out
+    assert "[1/1] score=0.2500 | 2026-01-02 | session=session-1" in output
+    assert "Q: test\nA: result" in output
