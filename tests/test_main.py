@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import sqlite3
 from pathlib import Path
 
@@ -146,3 +148,20 @@ def test_normalize_cli_argv_handles_hyphen_only_query():
         "--top-k",
         "2",
     ]
+
+
+def test_main_import_does_not_import_sentence_transformers():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import kasane.main, sys; "
+                "assert 'sentence_transformers' not in sys.modules"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout == ""

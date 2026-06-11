@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import os
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 import logging
 
-from sentence_transformers import SentenceTransformer
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +14,8 @@ _model: SentenceTransformer | None = None
 
 
 def _load_model(allow_download: bool) -> SentenceTransformer:
+    from sentence_transformers import SentenceTransformer
+
     if allow_download:
         return SentenceTransformer(MODEL_NAME)
     original_hf_offline = os.environ.get("HF_HUB_OFFLINE")
