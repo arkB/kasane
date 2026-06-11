@@ -505,7 +505,7 @@ def main() -> None:
         args.func(args)
     except Exception as e:
         logger.warning(f"Error during {args.command}: {e}")
-        sys.exit(0)
+        sys.exit(0 if args.command == "save" else 1)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ import sys
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from kasane import main
 
 
@@ -165,3 +167,29 @@ def test_main_import_does_not_import_sentence_transformers():
         text=True,
     )
     assert result.stdout == ""
+
+
+def test_main_save_failure_exits_zero(monkeypatch):
+    def fail_save(_args):
+        raise RuntimeError("save failed")
+
+    monkeypatch.setattr(sys, "argv", ["kasane", "save", "--transcript", "missing.jsonl"])
+    monkeypatch.setattr(main, "cmd_save", fail_save)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main.main()
+
+    assert exc_info.value.code == 0
+
+
+def test_main_non_save_failure_exits_nonzero(monkeypatch):
+    def fail_stats(_args):
+        raise RuntimeError("stats failed")
+
+    monkeypatch.setattr(sys, "argv", ["kasane", "stats"])
+    monkeypatch.setattr(main, "cmd_stats", fail_stats)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main.main()
+
+    assert exc_info.value.code != 0
