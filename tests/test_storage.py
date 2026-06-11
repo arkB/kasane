@@ -7,6 +7,7 @@ import pytest
 
 from kasane import storage
 from kasane.storage import (
+    get_stats,
     get_import_state,
     MemoryChunk,
     delete_session,
@@ -17,6 +18,8 @@ from kasane.storage import (
     session_exists,
     set_import_state,
 )
+
+DEFAULT_DB_PATH = storage.DB_PATH
 
 
 @pytest.fixture(autouse=True)
@@ -56,6 +59,42 @@ def test_init_db_creates_tables(temp_db):
     assert "memories_ad" in triggers
     assert "memories_au" in triggers
     conn.close()
+
+
+def test_resolve_db_path_uses_default_when_env_unset(monkeypatch):
+    monkeypatch.delenv("KASANE_DB_PATH", raising=False)
+    monkeypatch.setattr(storage, "DB_PATH", DEFAULT_DB_PATH)
+
+    assert storage._resolve_db_path() == DEFAULT_DB_PATH
+
+
+def test_resolve_db_path_uses_env_when_set(monkeypatch, tmp_path):
+    custom_db_path = tmp_path / "custom-memory.db"
+    monkeypatch.setenv("KASANE_DB_PATH", str(custom_db_path))
+
+    assert storage._resolve_db_path() == custom_db_path
+
+
+def test_env_db_path_supports_init_insert_and_stats(monkeypatch, tmp_path):
+    custom_db_path = tmp_path / "custom-memory.db"
+    monkeypatch.setenv("KASANE_DB_PATH", str(custom_db_path))
+
+    init_db()
+    chunks = [
+        MemoryChunk(
+            session_id="env123",
+            chunk_text="Q: Env?\nA: Works.",
+            created_at=datetime(2025, 1, 1, 12, 0, 0),
+            metadata={"transcript_path": "/tmp/env.jsonl", "chunk_index": 0},
+        )
+    ]
+    insert_chunks(chunks, [[0.2] * 768])
+
+    stats = get_stats()
+    assert custom_db_path.exists()
+    assert stats["total_memories"] == 1
+    assert stats["total_sessions"] == 1
+    assert stats["db_size_bytes"] == custom_db_path.stat().st_size
 
 
 def test_insert_chunks_and_sync_ids(temp_db):

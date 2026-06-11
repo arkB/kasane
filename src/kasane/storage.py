@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 import json
 import logging
+import os
 import sqlite3
 from typing import Optional
 
@@ -11,6 +12,7 @@ import sqlite_vec
 logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "memory.db"
+DB_PATH_ENV_VAR = "KASANE_DB_PATH"
 
 
 @dataclass
@@ -42,8 +44,15 @@ class ImportState:
     state_value: str
 
 
+def _resolve_db_path() -> Path:
+    override = os.environ.get(DB_PATH_ENV_VAR)
+    if override:
+        return Path(override)
+    return DB_PATH
+
+
 def _get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(_resolve_db_path()))
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)
@@ -51,7 +60,8 @@ def _get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db_path = _resolve_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = _get_connection()
     cursor = conn.cursor()
     cursor.executescript("""
@@ -114,7 +124,7 @@ def init_db() -> None:
         """)
     conn.commit()
     conn.close()
-    logger.info(f"Database initialized at {DB_PATH}")
+    logger.info(f"Database initialized at {db_path}")
 
 
 def session_exists(session_id: str) -> bool:
@@ -315,13 +325,14 @@ def get_memories_by_ids(ids: list[int]) -> dict[int, MemoryResult]:
 
 
 def get_stats() -> dict:
+    db_path = _resolve_db_path()
     conn = _get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM memories")
     total_memories = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(DISTINCT session_id) FROM memories")
     total_sessions = cursor.fetchone()[0]
-    db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
+    db_size = db_path.stat().st_size if db_path.exists() else 0
     conn.close()
     return {
         "total_memories": total_memories,
