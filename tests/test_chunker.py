@@ -81,6 +81,42 @@ def test_parse_transcript_integration(tmp_path):
     assert "A: Test answer." in chunks[0].chunk_text
 
 
+def test_parse_claude_code_transcript_filters_non_conversation_content():
+    fixture = Path(__file__).parent / "fixtures" / "claude_code_transcript.jsonl"
+
+    messages = chunker._load_messages(fixture)
+    assert messages == [
+        {
+            "role": "user",
+            "content": "Claude Code transcript のパース方針を確認したい。",
+        },
+        {
+            "role": "assistant",
+            "content": "会話本文だけを保存します。\n内部ブロックは除外します。",
+        },
+        {"role": "user", "content": "text block だけを残して。"},
+        {
+            "role": "assistant",
+            "content": "了解しました。text block のみを連結します。",
+        },
+    ]
+
+    chunks, _ = chunker.parse_transcript(fixture)
+    assert len(chunks) == 2
+    chunk_text = "\n".join(chunk.chunk_text for chunk in chunks)
+    assert "Q: Claude Code transcript のパース方針を確認したい。" in chunk_text
+    assert "A: 会話本文だけを保存します。\n内部ブロックは除外します。" in chunk_text
+    assert "Q: text block だけを残して。" in chunk_text
+    assert "A: 了解しました。text block のみを連結します。" in chunk_text
+
+    assert "{'role':" not in chunk_text
+    assert "thinking" not in chunk_text
+    assert "signature" not in chunk_text
+    assert "tool_use" not in chunk_text
+    assert "tool_result" not in chunk_text
+    assert "sidechain" not in chunk_text
+
+
 def test_load_codex_messages(tmp_path):
     jsonl_file = tmp_path / "codex.jsonl"
     jsonl_file.write_text(

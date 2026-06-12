@@ -121,19 +121,48 @@ def _load_messages(file_path: Path) -> list[dict[str, str]]:
             except json.JSONDecodeError as e:
                 logger.warning(f"Invalid JSON at line {line_num}: {e}")
                 continue
-            role = obj.get("role", obj.get("type", ""))
-            content = obj.get("content", obj.get("message", ""))
-            if isinstance(content, list):
-                content_parts = []
-                for item in content:
-                    if isinstance(item, dict) and "text" in item:
-                        content_parts.append(item["text"])
-                    elif isinstance(item, str):
-                        content_parts.append(item)
-                content = "\n".join(content_parts)
+            if obj.get("isSidechain") is True:
+                continue
+
+            obj_type = obj.get("type")
+            if obj_type in ("user", "assistant"):
+                message = obj.get("message")
+                if not isinstance(message, dict):
+                    continue
+                role = message.get("role", "")
+                content = _join_claude_content_parts(message.get("content", ""))
+            elif "role" in obj:
+                role = obj.get("role", "")
+                content = obj.get("content", "")
+                if isinstance(content, list):
+                    content_parts = []
+                    for item in content:
+                        if isinstance(item, dict) and "text" in item:
+                            content_parts.append(item["text"])
+                        elif isinstance(item, str):
+                            content_parts.append(item)
+                    content = "\n".join(content_parts)
+            else:
+                continue
             if role and content:
                 messages.append({"role": role, "content": str(content)})
     return messages
+
+
+def _join_claude_content_parts(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        content_parts = [
+            item["text"]
+            for item in content
+            if isinstance(item, dict)
+            and item.get("type") == "text"
+            and isinstance(item.get("text"), str)
+            and item.get("text")
+        ]
+        return "\n".join(content_parts)
+    return ""
 
 
 def _join_content_parts(content: Any) -> str:

@@ -1,0 +1,12 @@
+{"type":"mode","mode":"default"}
+{"type":"permission-mode","mode":"acceptEdits"}
+{"type":"user","message":{"role":"user","content":"Claude Code transcript のパース方針を確認したい。"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"この内容は保存しない","signature":"opaque-signature-value"},{"type":"text","text":"会話本文だけを保存します。"},{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"src/kasane/chunker.py"}},{"type":"text","text":"内部ブロックは除外します。"}]}}
+{"type":"file-history-snapshot","files":["src/kasane/chunker.py"]}
+{"type":"attachment","fileName":"screenshot.png","contentType":"image/png"}
+{"type":"ai-title","title":"パーサ修正"}
+{"type":"last-prompt","prompt":"ignore me"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"tool_result の中身は保存しない"},{"type":"text","text":"text block だけを残して。"}]}}
+{"type":"assistant","message":{"role":"assistant","content":"了解しました。text block のみを連結します。"}}
+{"type":"assistant","isSidechain":true,"message":{"role":"assistant","content":[{"type":"text","text":"sidechain text should not be saved"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_2","content":"empty conversation after filtering"}]}}
