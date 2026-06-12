@@ -6,6 +6,7 @@ from kasane.chunker import (
     _create_qa_pairs,
     _extract_codex_session_info,
     _generate_session_id,
+    _is_environment_context_message,
     _load_codex_messages,
     _load_messages,
     _split_into_chunks,
@@ -157,6 +158,57 @@ def test_parse_codex_transcript_integration(tmp_path):
     assert chunks[0].session_id == "session-xyz"
     assert "Q: 前に決めた方針は？" in chunks[0].chunk_text
     assert "A: watcher 方式にします。" in chunks[0].chunk_text
+
+
+def test_is_environment_context_message_only_matches_codex_meta_block():
+    assert _is_environment_context_message(
+        "<environment_context>\n"
+        "  <cwd>/home/karaki/dev/kasane</cwd>\n"
+        "  <approval_policy>on-request</approval_policy>\n"
+        "</environment_context>"
+    )
+    assert not _is_environment_context_message(
+        "説明文として <environment_context> という文字列を扱う場合は残してください。"
+    )
+
+
+def test_parse_codex_transcript_filters_environment_context_meta_message():
+    fixture = (
+        Path(__file__).parent
+        / "fixtures"
+        / "codex_environment_context_transcript.jsonl"
+    )
+
+    messages = _load_codex_messages(fixture)
+    assert messages == [
+        {"role": "user", "content": "Codex transcript parser の挙動を確認したい。"},
+        {"role": "assistant", "content": "通常の依頼と応答は保存します。"},
+        {
+            "role": "user",
+            "content": "説明文として <environment_context> という文字列を扱う場合は残してください。",
+        },
+        {
+            "role": "assistant",
+            "content": "説明対象の文字列は通常の会話として扱います。",
+        },
+    ]
+
+    chunks, _ = chunker.parse_codex_transcript(fixture)
+    assert len(chunks) == 2
+    chunk_text = "\n".join(chunk.chunk_text for chunk in chunks)
+
+    assert "Q: Codex transcript parser の挙動を確認したい。" in chunk_text
+    assert "A: 通常の依頼と応答は保存します。" in chunk_text
+    assert (
+        "Q: 説明文として <environment_context> という文字列を扱う場合は残してください。"
+        in chunk_text
+    )
+    assert "A: 説明対象の文字列は通常の会話として扱います。" in chunk_text
+
+    assert "<cwd>" not in chunk_text
+    assert "approval_policy" not in chunk_text
+    assert "sandbox_mode" not in chunk_text
+    assert "network_access" not in chunk_text
 
 
 def test_parse_opencode_session_integration(tmp_path):

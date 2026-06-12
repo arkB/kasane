@@ -181,6 +181,13 @@ def _join_content_parts(content: Any) -> str:
     return ""
 
 
+def _is_environment_context_message(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped.startswith("<environment_context>"):
+        return False
+    return "</environment_context>" in stripped
+
+
 def _load_codex_messages(file_path: Path) -> list[dict[str, str]]:
     messages = []
     with open(file_path, "r", encoding="utf-8") as f:
@@ -202,6 +209,8 @@ def _load_codex_messages(file_path: Path) -> list[dict[str, str]]:
             if role not in ("user", "assistant"):
                 continue
             content = _join_content_parts(payload.get("content", []))
+            if role == "user" and _is_environment_context_message(content):
+                continue
             if content:
                 messages.append({"role": str(role), "content": content})
     return messages

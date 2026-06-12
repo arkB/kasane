@@ -1,0 +1,6 @@
+{"type":"session_meta","payload":{"id":"codex-env-session","timestamp":"2026-06-12T00:00:00.000Z"}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/home/karaki/dev/kasane</cwd>\n  <shell>bash</shell>\n  <approval_policy>on-request</approval_policy>\n  <sandbox_mode>workspace-write</sandbox_mode>\n  <network_access>restricted</network_access>\n  <current_date>2026-06-12</current_date>\n</environment_context>"}]}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Codex transcript parser の挙動を確認したい。"}]}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"通常の依頼と応答は保存します。"}]}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"説明文として <environment_context> という文字列を扱う場合は残してください。"}]}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"説明対象の文字列は通常の会話として扱います。"}]}}
